@@ -1,22 +1,30 @@
 import { next } from "@vercel/functions";
 
 /**
- * Vercel Routing Middleware — bot traffic → ostr.io prerendering CDN.
+ * Vercel Routing Middleware: sends crawler requests to the ostr.io
+ * pre-rendering service.
  *
- * Drop this file at your project root. Vercel picks it up automatically.
- * Works with any framework (Astro, Next.js, SvelteKit, plain static).
+ * Copy this file to your project root, next to package.json. Vercel runs
+ * it before the CDN cache, on the Node.js runtime by default. It also runs
+ * on the Edge runtime: it uses only fetch, Headers, URL, AbortController
+ * and btoa.
  *
- * Human traffic passes through unchanged. Bot traffic is proxied to
- * ostr.io which returns a fully rendered snapshot. Graceful fallback
- * to origin if ostr.io is unavailable.
+ * Not for Next.js or Astro: Vercel Routing Middleware can't be used with
+ * frameworks that build their own routing middleware. Next.js users: use
+ * the seo-middleware-nextjs npm package in proxy.ts (Next.js 16+) or
+ * middleware.ts.
  *
- * Env vars (set in Vercel dashboard):
- *   OSTR_SERVICE_URL  — default: https://render.ostr.io
- *   OSTR_AUTH         — Basic <base64 user:password> from ostr.io dashboard
- *   OSTR_SITE_ORIGIN  — canonical origin (e.g. https://example.com)
- *                        required when preview URLs differ from registered domain
+ * Humans pass through unchanged. Crawlers get the page rendered by ostr.io.
+ * If ostr.io fails or times out, the request falls back to your origin.
  *
- * Bot list sourced from veliovgroup/spiderable-middleware.
+ * Env vars (set in the Vercel dashboard):
+ *   OSTR_AUTH         "Basic xxx" from the ostr.io dashboard, or "user:pass"
+ *   OSTR_SITE_ORIGIN  canonical origin (e.g. https://example.com), needed
+ *                     when preview URLs differ from the registered domain
+ *   OSTR_SERVICE_URL  default: https://render.ostr.io
+ *   OSTR_TIMEOUT      renderer timeout in ms, default: 20000
+ *
+ * Docs: https://github.com/ostr-io/ostrio-docs
  */
 
 const BOT_AGENTS = [
