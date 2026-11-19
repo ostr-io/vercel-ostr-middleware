@@ -102,7 +102,8 @@ export default async function middleware(request) {
   if (STATIC_EXT.test(url.pathname)) return next();
   if (url.pathname.includes("/.well-known/")) return next();
 
-  const ua = (request.headers.get("user-agent") || "").toLowerCase();
+  // BOT_RE is case-insensitive, keep the UA as sent so ostr.io sees the real value
+  const ua = request.headers.get("user-agent") || "";
   const isBot = BOT_RE.test(ua);
   const hasEscapedFragment = url.searchParams.has("_escaped_fragment_");
 
