@@ -75,6 +75,24 @@ const STATIC_EXT = /\.(?:3ds|3g2|3gp|3gpp|7z|a|aac|aaf|adp|ai|aif|aiff|alz|ape|a
 
 const OSTRIO_HOST_RE = /(?:^|\.)ostr\.io$/i;
 
+// ostr.io hands out OSTR_AUTH as a ready "Basic xxx" value. A plain
+// "user:pass" works too and gets base64-encoded here.
+const BASIC_AUTH_RE = /^Basic\s+\S/i;
+let authWarned = false;
+
+function readAuth(serviceURL) {
+  const value = (process.env.OSTR_AUTH || "").trim();
+  if (!value) {
+    // Self-hosted renderers may not need credentials, ostr.io always does
+    if (!authWarned && OSTRIO_HOST_RE.test(new URL(serviceURL).hostname)) {
+      authWarned = true;
+      console.warn('[ostr-middleware] OSTR_AUTH is empty, ostr.io will reject requests. Set it to "Basic xxx" or "user:pass" from ostr.io');
+    }
+    return "";
+  }
+  return BASIC_AUTH_RE.test(value) ? value : "Basic " + btoa(value);
+}
+
 // Visitor request headers passed on to the renderer, everything else is dropped
 const FORWARD_HEADERS = ["user-agent", "accept", "accept-language"];
 
@@ -181,7 +199,6 @@ export default async function middleware(request) {
 
   // Proxy bot request to ostr.io
   const serviceURL = process.env.OSTR_SERVICE_URL || "https://render.ostr.io";
-  const auth = process.env.OSTR_AUTH || "";
 
   // Use canonical origin — ostr.io only allows registered domains
   const canonicalOrigin = process.env.OSTR_SITE_ORIGIN || url.origin;
@@ -209,6 +226,7 @@ export default async function middleware(request) {
       const value = request.headers.get(name);
       if (value) headers.set(name, value);
     }
+    const auth = readAuth(serviceURL);
     if (auth) headers.set("Authorization", auth);
 
     const response = await fetchRenderer(renderUrl, { method: request.method, headers, redirect: "manual" }, readTimeout());
