@@ -48,6 +48,24 @@ const STATIC_EXT = /\.(js|css|xml|png|jpg|jpeg|gif|pdf|txt|ico|rss|zip|mp3|mp4|w
 // Visitor request headers passed on to the renderer, everything else is dropped
 const FORWARD_HEADERS = ["user-agent", "accept", "accept-language"];
 
+// Renderer response headers that must not reach the crawler. Same list as
+// `ignoredHeaders` in spiderable-middleware: hop-by-hop headers, headers
+// that describe the renderer's own connection or cache, and cookies.
+// fetch() already decompressed the body, so content-encoding and
+// content-length would describe bytes that no longer exist.
+const IGNORED_HEADERS = new Set(["age", "alt-svc", "cache-status", "cf-connecting-ip", "cf-ipcountry", "cf-cache-status", "cf-ray", "cf-request-id", "cnection", "cneonction", "connection", "content-encoding", "content-length", "date", "etag", "expect-ct", "expires", "keep-alive", "last-modified", "link", "nel", "nncoection", "pragma", "proxy-authenticate", "proxy-authorization", "proxy-connection", "server", "set-cookie", "status", "te", "trailer", "transfer-encoding", "report-to", "upgrade", "vary", "via", "www-authenticate", "x-accel-buffering", "x-accel-charset", "x-accel-expires", "x-accel-limit-rate", "x-accel-redirect", "x-ostrio-domain", "x-powered-by", "x-preprender-status", "x-prerender-status", "x-real-ip", "x-runtime"]);
+
+function filterResponseHeaders(source) {
+  const headers = new Headers();
+  for (const [name, value] of source) {
+    const key = name.toLowerCase();
+    // x-middleware-* headers are Vercel routing instructions, never take them from upstream
+    if (IGNORED_HEADERS.has(key) || key.startsWith("x-middleware-")) continue;
+    headers.append(name, value);
+  }
+  return headers;
+}
+
 export default async function middleware(request) {
   const url = new URL(request.url);
 
@@ -91,7 +109,10 @@ export default async function middleware(request) {
     const response = await fetch(renderUrl, { headers, redirect: "manual" });
 
     if (response.ok || response.status === 301 || response.status === 302) {
-      return response;
+      return new Response(response.body, {
+        status: response.status,
+        headers: filterResponseHeaders(response.headers),
+      });
     }
 
     console.warn(`[ostr-middleware] ostr.io returned ${response.status}, falling back to origin`);
