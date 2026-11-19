@@ -120,13 +120,19 @@ export default async function middleware(request) {
 
   // Use canonical origin — ostr.io only allows registered domains
   const canonicalOrigin = process.env.OSTR_SITE_ORIGIN || url.origin;
-  let targetUrl = canonicalOrigin + url.pathname;
-  if (url.search && url.search.length > 1) {
-    const cleanParams = new URLSearchParams(url.searchParams);
+  let targetPath = url.pathname;
+  const cleanParams = new URLSearchParams(url.searchParams);
+  if (hasEscapedFragment) {
+    // Legacy AJAX crawling: /page?_escaped_fragment_=/section renders /page/section
+    const fragment = cleanParams.get("_escaped_fragment_");
     cleanParams.delete("_escaped_fragment_");
-    const qs = cleanParams.toString();
-    if (qs) targetUrl += "?" + qs;
+    if (fragment) {
+      targetPath = targetPath.replace(/\/$/, "") + "/" + fragment.replace(/^\//, "");
+    }
   }
+  let targetUrl = canonicalOrigin + targetPath;
+  const qs = cleanParams.toString();
+  if (qs) targetUrl += "?" + qs;
 
   const renderUrl = `${serviceURL}/?url=${encodeURIComponent(targetUrl)}&bot=${encodeURIComponent(ua)}`;
 
