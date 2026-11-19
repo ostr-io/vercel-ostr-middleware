@@ -134,10 +134,10 @@ export default async function middleware(request) {
     }
     if (auth) headers.set("Authorization", auth);
 
-    const response = await fetchRenderer(renderUrl, { headers, redirect: "manual" }, readTimeout());
+    const response = await fetchRenderer(renderUrl, { method: request.method, headers, redirect: "manual" }, readTimeout());
 
     if (response.ok || response.status === 301 || response.status === 302) {
-      return new Response(response.body, {
+      return new Response(request.method === "HEAD" ? null : response.body, {
         status: response.status,
         headers: filterResponseHeaders(response.headers),
       });
