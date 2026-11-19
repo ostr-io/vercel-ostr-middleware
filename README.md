@@ -47,7 +47,7 @@ npm install @vercel/functions
 | Variable | Value | Required |
 |----------|-------|----------|
 | `OSTR_AUTH` | `Basic xxx` from the ostr.io dashboard, or `user:pass` | Yes |
-| `OSTR_SITE_ORIGIN` | `https://yourdomain.com` | Only if preview URLs differ from your registered domain |
+| `OSTR_SITE_ORIGIN` | `https://yourdomain.com`, `ROOT_URL` works as an alias | Only if preview URLs differ from your registered domain |
 | `OSTR_SERVICE_URL` | Rendering endpoint | No, defaults to `https://render.ostr.io` |
 | `OSTR_TIMEOUT` | Milliseconds to wait for ostr.io | No, defaults to `20000` |
 

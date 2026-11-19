@@ -20,7 +20,8 @@ import { next } from "@vercel/functions";
  * Env vars (set in the Vercel dashboard):
  *   OSTR_AUTH         "Basic xxx" from the ostr.io dashboard, or "user:pass"
  *   OSTR_SITE_ORIGIN  canonical origin (e.g. https://example.com), needed
- *                     when preview URLs differ from the registered domain
+ *                     when preview URLs differ from the registered domain,
+ *                     ROOT_URL works as an alias
  *   OSTR_SERVICE_URL  default: https://render.ostr.io
  *   OSTR_TIMEOUT      renderer timeout in ms, default: 20000
  *
@@ -211,7 +212,7 @@ export default async function middleware(request) {
   const serviceURL = process.env.OSTR_SERVICE_URL || "https://render.ostr.io";
 
   // Use canonical origin — ostr.io only allows registered domains
-  const canonicalOrigin = process.env.OSTR_SITE_ORIGIN || url.origin;
+  const canonicalOrigin = process.env.OSTR_SITE_ORIGIN || process.env.ROOT_URL || url.origin;
   let targetPath = url.pathname;
   const cleanParams = new URLSearchParams(url.searchParams);
   if (hasEscapedFragment) {

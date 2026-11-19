@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 const GOOGLEBOT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
 const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
-const ENV_KEYS = ["OSTR_AUTH", "OSTR_SERVICE_URL", "OSTR_SITE_ORIGIN", "OSTR_TIMEOUT"];
+const ENV_KEYS = ["OSTR_AUTH", "OSTR_SERVICE_URL", "OSTR_SITE_ORIGIN", "ROOT_URL", "OSTR_TIMEOUT"];
 
 const realFetch = globalThis.fetch;
 const realWarn = console.warn;
@@ -86,6 +86,14 @@ test("OSTR_SITE_ORIGIN replaces the request origin", async () => {
   mockFetch(rendered());
   await middleware(bot("/a"));
   assert.equal(calls[0].url.searchParams.get("url"), "https://www.example.org/a");
+});
+
+test("ROOT_URL works when OSTR_SITE_ORIGIN is not set", async () => {
+  process.env.ROOT_URL = "https://root.example.org";
+  const { default: middleware } = await load();
+  mockFetch(rendered());
+  await middleware(bot("/a"));
+  assert.equal(calls[0].url.searchParams.get("url"), "https://root.example.org/a");
 });
 
 test("1: only user-agent, accept, accept-language and authorization reach the renderer", async () => {
