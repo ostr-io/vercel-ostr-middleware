@@ -72,6 +72,8 @@ const BOT_AGENTS = [
   // Crawlers this middleware matched before the sync that the canonical list lacks
   "apis-google", "google-safety", "google-site-verification", "google-inspectiontool",
   "facebookcatalog", "telegrambot", "semrushbot", "anthropic-ai",
+  // Matched before the sync, kept so current deployments keep the same coverage
+  "naver", "ecosia", "tiktok", "chatgpt", "chrome-lighthouse",
 ];
 
 const BOT_RE = new RegExp(BOT_AGENTS.join("|"), "i");
