@@ -68,6 +68,43 @@ function filterResponseHeaders(source) {
   return headers;
 }
 
+// Statuses that the Response constructor refuses to pair with a body
+const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
+
+// The renderer's own error bodies are short text/plain messages that end
+// in a four-digit reason code, for example "Unauthorized! [1001]"
+const GATEWAY_ERROR_RE = /^(Bad request!|Unauthorized!|Not permitted for this domain\. Wrong domain\.|Internal server error!|Origin is unreachable!|Origin timed out!)[\s\S]*\[\d{4}\]$/;
+const GATEWAY_ERROR_MAX_BYTES = 512;
+
+// ostr.io forwards the status a page declares (`<meta name="response:status-code">`),
+// so a 404, 410 or 5xx can be the real answer the crawler must see. Fall back
+// to the origin only when ostr.io itself could not render the page. The rule
+// matches the ostr.io Cloudflare Worker:
+// - the response carries X-Prerender-Reason (an error ostr.io reports itself)
+// - the body is the renderer's own short text/plain error message
+// - a 5xx without X-Prerender-Id and X-Prerender-Cache: it came from the
+//   infrastructure in front of the renderer, every rendered page has them
+async function isRendererFailure(response) {
+  const headers = response.headers;
+  if (headers.get("x-prerender-reason")) return true;
+
+  if (response.status >= 500 && !headers.get("x-prerender-id") && !headers.get("x-prerender-cache")) {
+    return true;
+  }
+
+  if (response.status < 400) return false;
+  const contentType = (headers.get("content-type") || "").toLowerCase();
+  if (!contentType.startsWith("text/plain")) return false;
+  const length = Number.parseInt(headers.get("content-length") || "0", 10);
+  if (length > GATEWAY_ERROR_MAX_BYTES) return false;
+  try {
+    const text = (await response.clone().text()).trim();
+    return text.length <= GATEWAY_ERROR_MAX_BYTES && GATEWAY_ERROR_RE.test(text);
+  } catch {
+    return false;
+  }
+}
+
 // Edge Functions must start responding within 25 s, so the default leaves
 // room for the next() fallback after a timeout
 const DEFAULT_TIMEOUT_MS = 20000;
@@ -148,15 +185,21 @@ export default async function middleware(request) {
 
     const response = await fetchRenderer(renderUrl, { method: request.method, headers, redirect: "manual" }, readTimeout());
 
-    if (response.ok || response.status === 301 || response.status === 302) {
-      return new Response(request.method === "HEAD" ? null : response.body, {
-        status: response.status,
-        headers: filterResponseHeaders(response.headers),
-      });
+    if (await isRendererFailure(response)) {
+      console.warn(`[ostr-middleware] ostr.io returned ${response.status}, falling back to origin`);
+      if (response.status === 401 || response.status === 403) {
+        console.warn("[ostr-middleware] ostr.io rejected the credentials, check OSTR_AUTH");
+      }
+      return next();
     }
 
-    console.warn(`[ostr-middleware] ostr.io returned ${response.status}, falling back to origin`);
-    return next();
+    // The rendered page's status reaches the crawler as is: 200, a 3xx with
+    // its Location, or a genuine 404/410/5xx the page declared
+    const noBody = request.method === "HEAD" || NULL_BODY_STATUSES.has(response.status);
+    return new Response(noBody ? null : response.body, {
+      status: response.status,
+      headers: filterResponseHeaders(response.headers),
+    });
   } catch (err) {
     console.warn("[ostr-middleware] ostr.io fetch failed, falling back to origin:", err);
     return next();
