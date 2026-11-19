@@ -66,6 +66,34 @@ function filterResponseHeaders(source) {
   return headers;
 }
 
+// Edge Functions must start responding within 25 s, so the default leaves
+// room for the next() fallback after a timeout
+const DEFAULT_TIMEOUT_MS = 20000;
+
+function readTimeout() {
+  const ms = Number.parseInt(process.env.OSTR_TIMEOUT || "", 10);
+  return Number.isFinite(ms) && ms > 0 ? ms : DEFAULT_TIMEOUT_MS;
+}
+
+// One deadline covers both attempts. A network error before any response
+// (a stale keep-alive socket, a DNS blip) gets one retry. A timeout does
+// not: the time budget is already spent.
+async function fetchRenderer(url, init, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } catch (err) {
+      if (controller.signal.aborted) throw err;
+      return await fetch(url, { ...init, signal: controller.signal });
+    }
+  } finally {
+    // The renderer answered (or failed), stop the clock so the body can stream
+    clearTimeout(timer);
+  }
+}
+
 export default async function middleware(request) {
   const url = new URL(request.url);
 
@@ -106,7 +134,7 @@ export default async function middleware(request) {
     }
     if (auth) headers.set("Authorization", auth);
 
-    const response = await fetch(renderUrl, { headers, redirect: "manual" });
+    const response = await fetchRenderer(renderUrl, { headers, redirect: "manual" }, readTimeout());
 
     if (response.ok || response.status === 301 || response.status === 302) {
       return new Response(response.body, {
