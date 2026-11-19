@@ -1,0 +1,13 @@
+{
+  "name": "vercel-ostr-middleware",
+  "private": true,
+  "description": "Tests for middleware.js. Users copy middleware.js only, this file is not needed in their project.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "test": "node --import ./test/register.mjs --test test/middleware.test.mjs"
+  }
+}
