@@ -45,6 +45,8 @@ const BOT_RE = new RegExp(BOT_AGENTS.join("|"), "i");
 
 const STATIC_EXT = /\.(js|css|xml|png|jpg|jpeg|gif|pdf|txt|ico|rss|zip|mp3|mp4|webp|avif|svg|woff2?|ttf|eot|map|json|webmanifest)$/i;
 
+const OSTRIO_HOST_RE = /(?:^|\.)ostr\.io$/i;
+
 // Visitor request headers passed on to the renderer, everything else is dropped
 const FORWARD_HEADERS = ["user-agent", "accept", "accept-language"];
 
@@ -100,7 +102,10 @@ export default async function middleware(request) {
   // Only intercept GET/HEAD for HTML pages
   if (request.method !== "GET" && request.method !== "HEAD") return next();
   if (STATIC_EXT.test(url.pathname)) return next();
-  if (url.pathname.includes("/.well-known/")) return next();
+  // ACME challenges and other verification files must reach the app as is
+  if (url.pathname.startsWith("/.well-known/")) return next();
+  // A request for ostr.io itself would make the renderer call itself
+  if (OSTRIO_HOST_RE.test(url.hostname)) return next();
 
   // BOT_RE is case-insensitive, keep the UA as sent so ostr.io sees the real value
   const ua = request.headers.get("user-agent") || "";
