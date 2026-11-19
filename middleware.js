@@ -45,6 +45,9 @@ const BOT_RE = new RegExp(BOT_AGENTS.join("|"), "i");
 
 const STATIC_EXT = /\.(js|css|xml|png|jpg|jpeg|gif|pdf|txt|ico|rss|zip|mp3|mp4|webp|avif|svg|woff2?|ttf|eot|map|json|webmanifest)$/i;
 
+// Visitor request headers passed on to the renderer, everything else is dropped
+const FORWARD_HEADERS = ["user-agent", "accept", "accept-language"];
+
 export default async function middleware(request) {
   const url = new URL(request.url);
 
@@ -76,8 +79,13 @@ export default async function middleware(request) {
   const renderUrl = `${serviceURL}/?url=${encodeURIComponent(targetUrl)}&bot=${encodeURIComponent(ua)}`;
 
   try {
-    const headers = new Headers(request.headers);
-    headers.delete("Authorization");
+    // Send only what the renderer needs. Cookies, x-forwarded-* and
+    // x-vercel-* headers belong to the visitor and stay on Vercel.
+    const headers = new Headers();
+    for (const name of FORWARD_HEADERS) {
+      const value = request.headers.get(name);
+      if (value) headers.set(name, value);
+    }
     if (auth) headers.set("Authorization", auth);
 
     const response = await fetch(renderUrl, { headers, redirect: "manual" });
